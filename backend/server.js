@@ -6,6 +6,11 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const friendRoutes = require('./routes/friends');
+const groupRoutes = require('./routes/groups');
+const expenseRoutes = require('./routes/expenses');
+const settlementRoutes = require('./routes/settlements');
+const balanceRoutes = require('./routes/balances');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +27,11 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/settlements', settlementRoutes);
+app.use('/api/balances', balanceRoutes);
 
 // Socket.IO connection
 io.on('connection', (socket) => {
