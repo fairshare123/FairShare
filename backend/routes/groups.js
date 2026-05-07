@@ -57,6 +57,15 @@ router.post('/', protect, async (req, res) => {
     if (!name) {
       return res.status(400).json({ message: 'Group name is required' });
     }
+    // Check for duplicate group name (case insensitive)
+    const existingGroup = await Group.findOne({
+      'members.user': req.user._id,
+      name: { $regex: new RegExp(`^${name}$`, 'i') }
+    });
+
+    if (existingGroup) {
+      return res.status(400).json({ message: 'You already have a group with this name' });
+    }
 
     // Build members array — creator is always admin
     const members = [{ user: req.user._id, role: 'admin' }];
