@@ -119,6 +119,18 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Private
+router.post('/logout', protect, async (req, res) => {
+  try {
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @route   POST /api/auth/forgot-password/verify-email
 // @desc    Verify email exists and get security questions
 // @access  Public
