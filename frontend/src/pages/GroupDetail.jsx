@@ -44,6 +44,8 @@ const GroupDetail = () => {
   const [friends, setFriends] = useState([]);
   const [memberError, setMemberError] = useState('');
 
+  const [balanceView, setBalanceView] = useState('simplified');
+
   useEffect(() => { fetchAll(); }, [groupId]);
 
   const fetchAll = async () => {
@@ -146,26 +148,48 @@ const GroupDetail = () => {
     catch (err) { alert(err.response?.data?.message || 'Failed to delete.'); }
   };
 
+  // onChange — just update the value, nothing else
   const updateSplitField = (memberId, field, rawValue) => {
     const cleanVal = numOnly(rawValue);
-    setExpenseForm((prev) => {
-      const updated = prev.splitData.map((s) =>
+    setExpenseForm((prev) => ({
+      ...prev,
+      splitData: prev.splitData.map((s) =>
         s.userId === memberId ? { ...s, [field]: cleanVal } : s
-      );
-      const others = prev.splitAmong.filter((id) => id !== memberId);
-      const numVal = toInt(cleanVal);
+      ),
+    }));
+  };
 
-      if (prev.splitType === 'exact' && others.length > 0) {
-        const remaining = Math.max(0, toInt(prev.amount) - numVal);
-        const each = Math.round(remaining / others.length);
-        return { ...prev, splitData: updated.map((s) => others.includes(s.userId) ? { ...s, amount: String(each) } : s) };
+  // onBlur — once the user leaves a field, check if exactly one other is empty and auto-fill them
+  const autoFillLastEmpty = (memberId) => {
+    setExpenseForm((prev) => {
+      if (prev.splitType !== 'exact' && prev.splitType !== 'percentage') return prev;
+
+      const checkField = prev.splitType === 'exact' ? 'amount' : 'percentage';
+      const total = prev.splitType === 'exact' ? toInt(prev.amount) : 100;
+      const activeIds = prev.splitAmong;
+
+      // Find others (not the field just left) that are still empty
+      const emptyOthers = activeIds.filter((id) => {
+        if (id === memberId) return false;
+        const s = prev.splitData.find((sd) => sd.userId === id);
+        return !s || s[checkField] === '';
+      });
+
+      // Only auto-fill if exactly one other person has an empty field
+      if (emptyOthers.length === 1) {
+        const filledSum = prev.splitData
+          .filter((s) => activeIds.includes(s.userId) && s.userId !== emptyOthers[0])
+          .reduce((acc, s) => acc + toInt(s[checkField]), 0);
+        const remainder = Math.max(0, total - filledSum);
+        return {
+          ...prev,
+          splitData: prev.splitData.map((s) =>
+            s.userId === emptyOthers[0] ? { ...s, [checkField]: String(remainder) } : s
+          ),
+        };
       }
-      if (prev.splitType === 'percentage' && others.length > 0) {
-        const remaining = Math.max(0, 100 - numVal);
-        const each = Math.round(remaining / others.length);
-        return { ...prev, splitData: updated.map((s) => others.includes(s.userId) ? { ...s, percentage: String(each) } : s) };
-      }
-      return { ...prev, splitData: updated };
+
+      return prev;
     });
   };
 
@@ -223,6 +247,25 @@ const GroupDetail = () => {
   if (error) return <div className="flex items-center justify-center h-64 text-red-500">{error}</div>;
 
   const simplifiedDebts = balances?.simplifiedTransactions || [];
+
+  // Build member name map from group members
+  const memberMap = {};
+  members.forEach((m) => { memberMap[m.user?._id] = m.user?.name; });
+
+  // Breakdown: flat list of all raw pairwise debts, with names attached
+  const rawBalances = balances?.balances || {};
+  const breakdownDebts = [];
+  Object.entries(rawBalances).forEach(([debtorId, creditors]) => {
+    Object.entries(creditors).forEach(([creditorId, amount]) => {
+      if (amount > 0) {
+        breakdownDebts.push({
+          from: { id: debtorId, name: memberMap[debtorId] || 'Unknown' },
+          to: { id: creditorId, name: memberMap[creditorId] || 'Unknown' },
+          amount: Math.round(amount),
+        });
+      }
+    });
+  });
 
   // live split summary
   const totalAmt = toInt(expenseForm.amount);
@@ -306,20 +349,68 @@ const GroupDetail = () => {
 
       {activeTab === 'balances' && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-          {simplifiedDebts.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">All settled up!</p>
-          ) : simplifiedDebts.map((d, i) => {
-            const isMe = d.from?.id === user?._id;
-            return (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                <div>
-                  <p className="text-sm text-gray-900"><span className="font-medium">{d.from?.name}</span><span className="text-gray-400"> owes </span><span className="font-medium">{d.to?.name}</span></p>
-                  <p className="text-xs text-gray-400 mt-0.5">{formatAmount(d.amount)}</p>
-                </div>
-                {isMe && <button onClick={() => openSettleModal(d.to?.id, d.to?.name, d.amount)} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition">Settle</button>}
-              </div>
-            );
-          })}
+
+          {/* Breakdown / Simplified toggle */}
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+            {['simplified', 'breakdown'].map((view) => (
+              <button
+                key={view}
+                onClick={() => setBalanceView(view)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition ${balanceView === view ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {view}
+              </button>
+            ))}
+          </div>
+
+          {/* Simplified view */}
+          {balanceView === 'simplified' && (
+            <>
+              {simplifiedDebts.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">All settled up!</p>
+              ) : simplifiedDebts.map((d, i) => {
+                const isMe = d.from?.id === user?._id;
+                return (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                    <div>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">{d.from?.name}</span>
+                        <span className="text-gray-400"> owes </span>
+                        <span className="font-medium">{d.to?.name}</span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatAmount(d.amount)}</p>
+                    </div>
+                    {isMe && <button onClick={() => openSettleModal(d.to?.id, d.to?.name, d.amount)} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition">Settle</button>}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Breakdown view */}
+          {balanceView === 'breakdown' && (
+            <>
+              {breakdownDebts.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">All settled up!</p>
+              ) : breakdownDebts.map((d, i) => {
+                const isMe = d.from?.id === user?._id;
+                return (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                    <div>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">{d.from?.name}</span>
+                        <span className="text-gray-400"> owes </span>
+                        <span className="font-medium">{d.to?.name}</span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatAmount(d.amount)}</p>
+                    </div>
+                    {isMe && <button onClick={() => openSettleModal(d.to?.id, d.to?.name, d.amount)} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition">Settle</button>}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
         </div>
       )}
 
@@ -400,6 +491,7 @@ const GroupDetail = () => {
                             <input type="text" inputMode="numeric" placeholder="₩ amount"
                               value={sd.amount || ''}
                               onChange={(e) => updateSplitField(mid, 'amount', e.target.value)}
+                              onBlur={() => autoFillLastEmpty(mid)}
                               className="w-28 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500" />
                             {totalAmt > 0 && <span className="text-xs text-gray-400 mt-0.5">of ₩{totalAmt.toLocaleString()}</span>}
                           </div>
@@ -410,6 +502,7 @@ const GroupDetail = () => {
                             <input type="text" inputMode="numeric" placeholder="%"
                               value={sd.percentage || ''}
                               onChange={(e) => updateSplitField(mid, 'percentage', e.target.value)}
+                              onBlur={() => autoFillLastEmpty(mid)}
                               className="w-20 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500" />
                             <span className="text-xs text-gray-400 mt-0.5">
                               {toInt(sd.percentage) > 0 && totalAmt > 0 ? `₩${Math.round((toInt(sd.percentage) / 100) * totalAmt).toLocaleString()}` : 'of 100%'}
