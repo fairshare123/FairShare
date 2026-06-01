@@ -9,6 +9,17 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
+// Password strength validator
+const isPasswordStrong = (password) => (
+  password.length >= 6 &&
+  /[A-Z]/.test(password) &&
+  /[a-z]/.test(password) &&
+  /[0-9]/.test(password) &&
+  /[^A-Za-z0-9]/.test(password)
+);
+
+const PASSWORD_RULES = 'Password must be at least 6 characters and include one uppercase letter, one lowercase letter, one number, and one special character.';
+
 // Security questions bank
 const SECURITY_QUESTIONS = [
   'What was your first pet\'s name?',
@@ -49,6 +60,11 @@ router.post('/register', async (req, res) => {
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Validate password strength
+    if (!isPasswordStrong(password)) {
+      return res.status(400).json({ message: PASSWORD_RULES });
     }
 
     // Create user
@@ -192,8 +208,8 @@ router.post('/forgot-password/reset', protect, async (req, res) => {
   try {
     const { newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (!newPassword || !isPasswordStrong(newPassword)) {
+      return res.status(400).json({ message: PASSWORD_RULES });
     }
 
     const user = await User.findById(req.user._id);

@@ -267,6 +267,10 @@ const GroupDetail = () => {
     });
   });
 
+  // Is the current user personally all settled up?
+  const iAmSettledSimplified = simplifiedDebts.length > 0 && !simplifiedDebts.some((d) => d.from?.id === user?._id);
+  const iAmSettledBreakdown  = breakdownDebts.length  > 0 && !breakdownDebts.some((d)  => d.from?.id === user?._id);
+
   // live split summary
   const totalAmt = toInt(expenseForm.amount);
   const activeData = expenseForm.splitData.filter((s) => expenseForm.splitAmong.includes(s.userId));
@@ -366,6 +370,16 @@ const GroupDetail = () => {
           {/* Simplified view */}
           {balanceView === 'simplified' && (
             <>
+              {iAmSettledSimplified && (
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-teal-50 border border-teal-100">
+                  <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center shrink-0">
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-teal-700">You are all settled up in this group.</p>
+                </div>
+              )}
               {simplifiedDebts.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6">All settled up!</p>
               ) : simplifiedDebts.map((d, i) => {
@@ -390,6 +404,16 @@ const GroupDetail = () => {
           {/* Breakdown view */}
           {balanceView === 'breakdown' && (
             <>
+              {iAmSettledBreakdown && (
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-teal-50 border border-teal-100">
+                  <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center shrink-0">
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-teal-700">You are all settled up in this group.</p>
+                </div>
+              )}
               {breakdownDebts.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6">All settled up!</p>
               ) : breakdownDebts.map((d, i) => {

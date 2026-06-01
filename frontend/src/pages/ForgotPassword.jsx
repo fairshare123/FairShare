@@ -2,6 +2,39 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 
+const pwdChecks = (pwd) => [
+  { label: 'At least 6 characters',          ok: pwd.length >= 6 },
+  { label: 'One uppercase letter (A–Z)',      ok: /[A-Z]/.test(pwd) },
+  { label: 'One lowercase letter (a–z)',      ok: /[a-z]/.test(pwd) },
+  { label: 'One number (0–9)',                ok: /[0-9]/.test(pwd) },
+  { label: 'One special character (!@#…)',    ok: /[^A-Za-z0-9]/.test(pwd) },
+];
+
+const isPasswordStrong = (pwd) => pwdChecks(pwd).every((c) => c.ok);
+
+const PasswordStrength = ({ password }) => {
+  if (!password) return null;
+  const checks = pwdChecks(password);
+  return (
+    <div className="mt-2 space-y-1.5">
+      {checks.map((c, i) => (
+        <div
+          key={i}
+          className={`flex items-center gap-2 text-xs transition-colors duration-200 ${c.ok ? 'text-teal-600' : 'text-red-400'}`}
+        >
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            {c.ok
+              ? <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            }
+          </svg>
+          {c.label}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const ForgotPassword = () => {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
@@ -55,11 +88,11 @@ const ForgotPassword = () => {
   // Step 3 — Reset password
   const handleResetPassword = async (e) => {
     e.preventDefault();
+    if (!isPasswordStrong(newPassword)) {
+      return setError('Password does not meet all requirements.');
+    }
     if (newPassword !== confirmPassword) {
       return setError('Passwords do not match.');
-    }
-    if (newPassword.length < 6) {
-      return setError('Password must be at least 6 characters.');
     }
     setLoading(true);
     setError('');
@@ -206,6 +239,7 @@ const ForgotPassword = () => {
                     placeholder="••••••••"
                     className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
+                  <PasswordStrength password={newPassword} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>

@@ -9,6 +9,7 @@ import Groups from './pages/Groups';
 import GroupDetail from './pages/GroupDetail';
 import Friends from './pages/Friends';
 import History from './pages/History';
+import Reports from './pages/Reports';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ const AppRoutes = () => {
         <Route path="groups/:groupId" element={<GroupDetail />} />
         <Route path="friends" element={<Friends />} />
         <Route path="history" element={<History />} />
+        <Route path="reports" element={<Reports />} />
       </Route>
 
       {/* Fallback */}
